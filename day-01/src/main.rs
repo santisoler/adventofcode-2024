@@ -1,15 +1,23 @@
+use std::collections::HashMap;
 use std::fs;
 use std::iter;
 
 #[cfg(test)]
 mod tests {
-    use crate::solve_part1;
+    use crate::{solve_part1, solve_part2};
 
     #[test]
     fn test_part1() {
         let fname = "data/test_input";
         let result = solve_part1(fname.to_string());
         assert_eq!(result, 11);
+    }
+
+    #[test]
+    fn test_part2() {
+        let fname = "data/test_input";
+        let result = solve_part2(fname.to_string());
+        assert_eq!(result, 31);
     }
 }
 
@@ -35,18 +43,33 @@ fn solve_part1(fname: String) -> i32 {
     let (mut left, mut right) = read_file(fname);
     left.sort();
     right.sort();
-    let result = {
-        let mut result = 0;
-        for (l, r) in iter::zip(left, right) {
-            result += (r - l).abs();
-        }
-        result
-    };
+    let result = iter::zip(left, right).map(|(x, y)| (x - y).abs()).sum();
     return result;
+}
+
+fn solve_part2(fname: String) -> i32 {
+    let (left, right) = read_file(fname);
+    let counts: HashMap<i32, i32> = {
+        let mut counts = HashMap::new();
+        for element in right {
+            counts.entry(element).and_modify(|x| *x += 1).or_insert(1);
+        }
+        counts
+    };
+    let result = left
+        .iter()
+        .map(|x| match counts.get(&x) {
+            Some(v) => x * v,
+            None => 0,
+        })
+        .sum();
+    result
 }
 
 fn main() {
     let fname = "data/input";
     let solution = solve_part1(fname.to_string());
     println!("Solution to part 1: {solution}");
+    let solution = solve_part2(fname.to_string());
+    println!("Solution to part 2: {solution}");
 }
