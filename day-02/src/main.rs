@@ -62,20 +62,11 @@ fn is_valid_with_tolerance(report: &Vec<i32>) -> bool {
     // Return true if the report is valid.
     //
     // Allow one bad level as tolerance.
-
     let mut prev_diff: Option<i32> = None;
     for i in 0..report.len() - 1 {
         if !is_level_valid(report[i], report[i + 1], &mut prev_diff) {
-            let min_value = {
-                match i {
-                    0 => 0,
-                    _ => i - 1,
-                }
-            };
+            let min_value = if i == 0 { i } else { i - 1 };
             for j in min_value..=i + 1 {
-                if j < 0 as usize {
-                    continue;
-                }
                 let mut new_report = report.clone();
                 new_report.remove(j);
                 if is_valid(&new_report) {
