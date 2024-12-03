@@ -46,20 +46,14 @@ fn is_level_valid(this: i32, next: i32, prev_diff: &mut Option<i32>) -> bool {
     //
     // Can optionally take a previous difference.
     let diff = next - this;
-    match prev_diff {
-        Some(x) => {
-            if diff.signum() != x.signum() {
-                return false;
-            };
-        }
-        None => (),
-    }
-    match diff.abs() {
-        1..=3 => (),
-        _ => {
+    if let Some(x) = prev_diff {
+        if diff.signum() != x.signum() {
             return false;
-        }
-    }
+        };
+    };
+    if (diff.abs() < 1) | (diff.abs() > 3) {
+        return false;
+    };
     *prev_diff = Some(diff);
     return true;
 }
@@ -71,7 +65,6 @@ fn is_valid_with_tolerance(report: &Vec<i32>) -> bool {
 
     let mut prev_diff: Option<i32> = None;
     for i in 0..report.len() - 1 {
-        println!("{:?}", report[i]);
         if !is_level_valid(report[i], report[i + 1], &mut prev_diff) {
             let min_value = {
                 match i {
@@ -112,14 +105,11 @@ fn solve_part2(fname: &str) -> i32 {
     let content = read_file(fname);
     let mut result = 0;
     for line in content.lines() {
-        println!("");
-        println!("{}", line);
         let report: Vec<i32> = line
             .split_whitespace()
             .map(|x| x.parse().expect("Couldn't convert to integer."))
             .collect();
         let blah = is_valid_with_tolerance(&report) as i32;
-        println!("is valid? {blah}");
         result += blah;
     }
     return result;
