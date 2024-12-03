@@ -47,16 +47,21 @@ fn is_valid(report: &Vec<i32>) -> bool {
         .into_iter();
 
     // Iterate over the other diffs
-    let mut prev_diff: i32 = 0;
-    for (index, diff) in diffs.enumerate() {
+    let mut prev_diff: Option<i32> = None;
+    for diff in diffs {
         match diff.abs() {
             1..=3 => (),
             _ => return false,
         };
-        if index > 0 as usize && diff.signum() != prev_diff.signum() {
-            return false;
-        };
-        prev_diff = diff;
+        match prev_diff {
+            Some(v) => {
+                if diff.signum() != v.signum() {
+                    return false;
+                }
+            }
+            None => (),
+        }
+        prev_diff = Some(diff);
     }
     return true;
 }
