@@ -1,9 +1,10 @@
+mod re;
 use std::fs;
 
 #[cfg(test)]
 mod tests {
-    // use crate::{solve_part1, solve_part2};
     use crate::parse_line;
+    use crate::re;
     use crate::solve_part1;
 
     #[test]
@@ -11,6 +12,20 @@ mod tests {
         let fname = "data/test_input";
         let result = solve_part1(fname);
         assert_eq!(result, 161);
+    }
+
+    #[test]
+    fn test_part1_re() {
+        let fname = "data/test_input";
+        let result = re::solve_part1(fname);
+        assert_eq!(result, 161);
+    }
+
+    #[test]
+    fn test_part2() {
+        let fname = "data/test_input_2";
+        let result = re::solve_part2(fname);
+        assert_eq!(result, 48);
     }
 
     #[test]
@@ -87,6 +102,8 @@ fn main() {
     let fname = "data/input";
     let result = solve_part1(fname);
     println!("Solution to part 1: {result}");
-    // let result = solve_part2(fname);
-    // println!("Solution to part 2: {result}");
+    let result = re::solve_part1(fname);
+    println!("Solution to part 1: {result}");
+    let result = re::solve_part2(fname);
+    println!("Solution to part 2: {result}");
 }
