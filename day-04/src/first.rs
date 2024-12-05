@@ -1,94 +1,73 @@
 use std::fs;
 
-fn count_xmas(string: &str) -> i32 {
-    let mut counts = 0;
-    counts += string.matches("XMAS").count();
-    counts += string.matches("SAMX").count();
-    counts as i32
-}
-
-fn get_columns(soup: &Vec<Vec<char>>) -> Vec<String> {
-    let m = soup[0].len();
-    let columns: Vec<String> = {
-        let mut columns = Vec::new();
-        for j in 0..m {
-            let column: String = soup.iter().map(|row| &row[j]).collect();
-            columns.push(column);
-        }
-        columns
-    };
-    return columns;
-}
-
-fn get_diagonal(soup: &Vec<Vec<char>>, index: i32) -> String {
-    let mut diagonal: Vec<char> = Vec::new();
-    let right_side = index >= 0;
-    let index = index.abs() as usize;
-    for i in 0..soup.len() - index {
-        if right_side {
-            diagonal.push(soup[i][i + index]);
-        } else {
-            diagonal.push(soup[i + index][i]);
-        };
-    }
-    diagonal.iter().collect()
-}
-
-fn get_anti_diagonal(soup: &Vec<Vec<char>>, index: i32) -> String {
-    let mut anti_diagonal: Vec<char> = Vec::new();
-    let right_side = index >= 0;
-    let index = index.abs() as usize;
+fn find_xmas(soup: &Vec<Vec<char>>, i: usize, j: usize) -> i32 {
     let n = soup.len();
-    for i in 0..n - index {
-        if right_side {
-            anti_diagonal.push(soup[i + index][n - 1 - i]);
-        } else {
-            anti_diagonal.push(soup[i][n - 1 - index - i]);
+    let mut result: i32 = 0;
+    // col
+    if i < n - 3 {
+        let word: String = (0..4).map(|delta| soup[i + delta][j]).collect();
+        if word.eq("XMAS") {
+            result += 1
+        }
+    }
+    if i >= 3 {
+        let word: String = (0..4).map(|delta| soup[i - delta][j]).collect();
+        if word.eq("XMAS") {
+            result += 1
         };
     }
-    anti_diagonal.iter().collect()
-}
-
-fn get_diagonals(soup: &Vec<Vec<char>>) -> Vec<String> {
-    let mut diagonals = Vec::new();
-    let n_diagonals: i32 = soup.len() as i32 - 1;
-    let mut i = -n_diagonals;
-    while i <= n_diagonals {
-        diagonals.push(get_diagonal(&soup, i));
-        i += 1;
+    // row
+    if j < n - 3 {
+        let word: String = (0..4).map(|delta| soup[i][j + delta]).collect();
+        if word.eq("XMAS") {
+            result += 1
+        }
     }
-    return diagonals;
-}
-
-fn get_anti_diagonals(soup: &Vec<Vec<char>>) -> Vec<String> {
-    let mut anti_diagonals = Vec::new();
-    let n_diagonals: i32 = soup.len() as i32 - 1;
-    let mut i = -n_diagonals;
-    while i <= n_diagonals {
-        anti_diagonals.push(get_anti_diagonal(&soup, i));
-        i += 1;
+    if j >= 3 {
+        let word: String = (0..4).map(|delta| soup[i][j - delta]).collect();
+        if word.eq("XMAS") {
+            result += 1
+        }
     }
-    return anti_diagonals;
+    // diagonals
+    if i < n - 3 && j < n - 3 {
+        let diag: String = (0..4).map(|delta| soup[i + delta][j + delta]).collect();
+        if diag.eq("XMAS") {
+            result += 1
+        }
+    }
+    if i >= 3 && j < n - 3 {
+        let diag: String = (0..4).map(|delta| soup[i - delta][j + delta]).collect();
+        if diag.eq("XMAS") {
+            result += 1
+        }
+    }
+    if i >= 3 && j >= 3 {
+        let diag: String = (0..4).map(|delta| soup[i - delta][j - delta]).collect();
+        if diag.eq("XMAS") {
+            result += 1
+        }
+    }
+    if i < n - 3 && j >= 3 {
+        let diag: String = (0..4).map(|delta| soup[i + delta][j - delta]).collect();
+        if diag.eq("XMAS") {
+            result += 1
+        }
+    }
+    return result;
 }
 
 pub fn solve_part1(fname: &str) -> i32 {
     let content = fs::read_to_string(&fname).expect("Couldn't read");
     let soup: Vec<Vec<char>> = content.lines().map(|line| line.chars().collect()).collect();
+    let n = soup.len();
     let mut counts = 0;
-    let rows = soup
-        .iter()
-        .map(|row| row.into_iter().collect::<String>())
-        .into_iter();
-    counts += rows.map(|s| count_xmas(&s)).sum::<i32>();
-
-    let columns = get_columns(&soup);
-    counts += columns.iter().map(|s| count_xmas(&s)).sum::<i32>();
-
-    let diagonals = get_diagonals(&soup);
-    counts += diagonals.iter().map(|s| count_xmas(&s)).sum::<i32>();
-
-    let anti_diagonals = get_anti_diagonals(&soup);
-    counts += anti_diagonals.iter().map(|s| count_xmas(&s)).sum::<i32>();
-
+    for i in 0..n {
+        for j in 0..n {
+            if soup[i][j] == 'X' {
+                counts += find_xmas(&soup, i, j);
+            };
+        }
+    }
     counts
 }
