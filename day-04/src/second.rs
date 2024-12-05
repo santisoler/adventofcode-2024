@@ -1,22 +1,18 @@
 use std::fs;
 
 fn is_cross(soup: &Vec<Vec<char>>, i: usize, j: usize) -> bool {
-    // Row-column
-    let (left, right) = (soup[i - 1][j], soup[i + 1][j]);
-    let (bottom, top) = (soup[i][j - 1], soup[i][j + 1]);
-    if ((left == 'M' && right == 'S') || (left == 'S' && right == 'M'))
-        && ((bottom == 'M' && top == 'S') || (bottom == 'S' && top == 'M'))
-    {
-        return true;
-    };
-    // Diagonals
     let (bottom_left, top_right) = (soup[i - 1][j - 1], soup[i + 1][j + 1]);
     let (bottom_right, top_left) = (soup[i + 1][j - 1], soup[i - 1][j + 1]);
-    if ((bottom_left == 'M' && top_right == 'S') || (bottom_left == 'S' && top_right == 'M'))
-        && ((bottom_right == 'M' && top_left == 'S') || (bottom_right == 'S' && top_left == 'M'))
-    {
+    if do_form_sam(bottom_left, top_right) && do_form_sam(bottom_right, top_left) {
         return true;
     };
+    return false;
+}
+
+fn do_form_sam(a: char, b: char) -> bool {
+    if (a == 'M' && b == 'S') || (a == 'S' && b == 'M') {
+        return true;
+    }
     return false;
 }
 
