@@ -11,6 +11,13 @@ mod tests {
         let result = solve_part1(fname);
         assert_eq!(result, 14);
     }
+
+    #[test]
+    fn test_part_2() {
+        let fname = "data/test_input";
+        let result = solve_part2(fname);
+        assert_eq!(result, 34);
+    }
 }
 
 #[derive(Debug, Eq, Hash)]
@@ -51,35 +58,76 @@ fn get_antinodes(antenna_a: &Position, antenna_b: &Position) -> (Position, Posit
     return (antinode_1, antinode_2);
 }
 
-fn solve_part1(fname: &str) -> i32 {
+fn get_all_antinodes(
+    antenna_a: &Position,
+    antenna_b: &Position,
+    nrows: i32,
+    ncols: i32,
+) -> Vec<Position> {
+    // Return positions of all antinodes, including the resonant harmonics
+    let x_diff = antenna_b.x - antenna_a.x;
+    let y_diff = antenna_b.y - antenna_a.y;
+
+    let mut antinodes = vec![];
+    let mut i = 0;
+    loop {
+        let antinode = Position {
+            x: antenna_a.x - i * x_diff,
+            y: antenna_a.y - i * y_diff,
+        };
+        if !antinode.is_inside(nrows, ncols) {
+            break;
+        }
+        antinodes.push(antinode);
+        i += 1;
+    }
+    let mut i = 0;
+    loop {
+        let antinode = Position {
+            x: antenna_b.x + i * x_diff,
+            y: antenna_b.y + i * y_diff,
+        };
+        if !antinode.is_inside(nrows, ncols) {
+            break;
+        }
+        antinodes.push(antinode);
+        i += 1;
+    }
+    return antinodes;
+}
+
+fn read_antennas(fname: &str) -> (HashMap<char, Vec<Position>>, i32) {
     let content = fs::read_to_string(fname).expect("Couldn't read");
     let ncols = content.lines().nth(0).unwrap().len() as i32;
-    let nrows = ncols; // assume a square
-    let antennas = {
-        let mut antennas: HashMap<char, Vec<Position>> = HashMap::new();
-        for (row, line) in content.lines().enumerate() {
-            for (col, character) in line.chars().enumerate() {
-                match character {
-                    '.' => (),
-                    _ => {
-                        antennas
-                            .entry(character)
-                            .and_modify(|p| {
-                                p.push(Position {
-                                    x: row as i32,
-                                    y: col as i32,
-                                })
-                            })
-                            .or_insert(vec![Position {
+    let mut antennas: HashMap<char, Vec<Position>> = HashMap::new();
+    for (row, line) in content.lines().enumerate() {
+        for (col, character) in line.chars().enumerate() {
+            match character {
+                '.' => (),
+                _ => {
+                    antennas
+                        .entry(character)
+                        .and_modify(|p| {
+                            p.push(Position {
                                 x: row as i32,
                                 y: col as i32,
-                            }]);
-                    }
+                            })
+                        })
+                        .or_insert(vec![Position {
+                            x: row as i32,
+                            y: col as i32,
+                        }]);
                 }
             }
         }
-        antennas
-    };
+    }
+    (antennas, ncols)
+}
+
+fn solve_part1(fname: &str) -> i32 {
+    let (antennas, ncols) = read_antennas(fname);
+    let nrows = ncols; // assume a square
+
     let mut antinodes: Vec<Position> = vec![];
     for (_, antenna_locations) in antennas.iter() {
         for pair in antenna_locations.iter().combinations(2) {
@@ -95,8 +143,23 @@ fn solve_part1(fname: &str) -> i32 {
     antinodes.iter().unique().count() as i32
 }
 
+fn solve_part2(fname: &str) -> i32 {
+    let (antennas, ncols) = read_antennas(fname);
+    let nrows = ncols; // assume a square
+
+    let mut antinodes: Vec<Position> = vec![];
+    for (_, antenna_locations) in antennas.iter() {
+        for pair in antenna_locations.iter().combinations(2) {
+            antinodes.extend(get_all_antinodes(pair[0], &pair[1], nrows, ncols))
+        }
+    }
+    antinodes.iter().unique().count() as i32
+}
+
 fn main() {
     let fname = "data/input";
     let result = solve_part1(fname);
     println!("Solution to part 1: {result}");
+    let result = solve_part2(fname);
+    println!("Solution to part 2: {result}");
 }
