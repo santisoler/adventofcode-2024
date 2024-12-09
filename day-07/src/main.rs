@@ -2,6 +2,7 @@ use itertools;
 use itertools::Itertools;
 use std::fs;
 use std::iter;
+use std::time::Instant;
 
 #[cfg(test)]
 mod tests {
@@ -42,14 +43,6 @@ fn concat(a: i64, b: i64) -> i64 {
     a * 10i64.pow(b.ilog10() + 1) + b
 }
 
-fn apply_operators(operators: &Vec<&Operator>, values: &Vec<i64>) -> i64 {
-    let mut result = values[0];
-    for (operator, value) in iter::zip(operators, &values[1..]) {
-        result = operator.operate(result, *value);
-    }
-    result
-}
-
 fn is_equation_valid(
     expected_result: i64,
     factors: &Vec<i64>,
@@ -58,7 +51,20 @@ fn is_equation_valid(
     let combinations =
         itertools::repeat_n(operator_types.iter(), factors.len() - 1).multi_cartesian_product();
     for operators in combinations {
-        if apply_operators(&operators, &factors) == expected_result {
+        // Apply operators
+        let result = {
+            let mut result = factors[0];
+            for (operator, value) in iter::zip(operators, &factors[1..]) {
+                result = operator.operate(result, *value);
+                // Stop the iterations if the result is already larger than the expected one
+                if result > expected_result {
+                    break;
+                }
+            }
+            result
+        };
+
+        if result == expected_result {
             return true;
         }
     }
@@ -113,6 +119,9 @@ fn main() {
     let fname = "data/input";
     let result = solve_part1(fname);
     println!("Solution to part 1: {result}");
+    let start = Instant::now();
     let result = solve_part2(fname);
+    let end = Instant::now();
     println!("Solution to part 2: {result}");
+    println!("Elapsed time: {}s", (end - start).as_secs_f64());
 }
