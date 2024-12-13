@@ -10,10 +10,6 @@ enum Block {
 
 impl fmt::Display for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // The `f` value implements the `Write` trait, which is what the
-        // write! macro is expecting. Note that this formatting ignores the
-        // various flags provided to format strings.
-        // write!(f, "({}, {})", self.x, self.y);
         let digits = match self {
             Block::File { id, size } => id.to_string().repeat(*size as usize),
             Block::FreeSpace { size } => ".".repeat(*size as usize),
@@ -22,54 +18,53 @@ impl fmt::Display for Block {
     }
 }
 
-fn move_file_block(block: Option<Block>, disk_map: &mut Vec<Block>) -> Result<Option<Block>, bool> {
-    // Print
-    for i in disk_map.iter() {
-        print!("{i}");
-    }
-    print!("\n");
-    // end print
-    let file_block = match block {
-        Some(block) => block,
-        None => return Ok(None),
-    };
-
+fn move_file_block(file_block: Block, disk_map: &mut Vec<Block>) -> bool {
     let index = get_index_next_free_space(disk_map);
     let index = match index {
         Some(i) => i,
-        None => return Err(true),
+        None => {
+            disk_map.push(file_block); // restore last popped element
+            return false;
+        }
     };
     let space_block = &mut disk_map[index];
 
     match (file_block, space_block) {
-        (Block::FreeSpace { size: _ }, _) => return Ok(None),
+        (Block::FreeSpace { size: _ }, _) => return true,
         (Block::File { id: _, size: _ }, Block::File { id: _, size: _ }) => {
             panic!()
         }
         (
             Block::File {
-                id: _,
-                size: file_size,
+                id,
+                size: ref mut file_size,
             },
             Block::FreeSpace {
                 size: ref mut space_size,
             },
         ) => match file_size.cmp(&space_size) {
             Ordering::Less => {
-                *space_size -= file_size;
+                *space_size -= *file_size;
                 disk_map.insert(index, file_block);
-                Ok(None)
             }
             Ordering::Greater => {
-                disk_map.remove(index);
-                return move_file_block(Some(file_block), disk_map);
+                let file_left = Block::File {
+                    id,
+                    size: *space_size,
+                };
+                let file_right = Block::File {
+                    id,
+                    size: *file_size - *space_size,
+                };
+                disk_map[index] = file_left;
+                disk_map.push(file_right);
             }
             Ordering::Equal => {
                 disk_map[index] = file_block;
-                Ok(None)
             }
         },
     }
+    return true;
 }
 
 fn get_index_next_free_space(disk_map: &Vec<Block>) -> Option<usize> {
@@ -79,20 +74,6 @@ fn get_index_next_free_space(disk_map: &Vec<Block>) -> Option<usize> {
         }
     }
     return None;
-}
-
-fn defrag(disk_map: &mut Vec<Block>) {
-    loop {
-        let last_file = disk_map.pop().unwrap();
-        let result = match last_file {
-            Block::FreeSpace { size: _ } => continue,
-            Block::File { id: _, size: _ } => move_file_block(Some(last_file), disk_map),
-        };
-        match result {
-            Ok(_) => continue,
-            Err(_) => break,
-        }
-    }
 }
 
 fn read_disk_map(fname: &str) -> Vec<Block> {
@@ -116,31 +97,39 @@ fn read_disk_map(fname: &str) -> Vec<Block> {
     return disk_map;
 }
 
-fn solve_part_one(fname: &str) -> i32 {
+fn defrag(disk_map: &mut Vec<Block>) {
+    loop {
+        let last_file = disk_map.pop().unwrap();
+        let result = match last_file {
+            Block::FreeSpace { size: _ } => continue,
+            Block::File { id: _, size: _ } => move_file_block(last_file, disk_map),
+        };
+        if !result {
+            return ();
+        }
+    }
+}
+
+pub fn solve_part_one(fname: &str) -> u64 {
     let mut disk_map = read_disk_map(fname);
     defrag(&mut disk_map);
-    for i in disk_map.iter() {
-        print!("{i}");
+
+    let mut result = 0;
+    let mut index = 0;
+    for block in disk_map {
+        match block {
+            Block::FreeSpace { size: _ } => panic!(),
+            Block::File { id, size } => {
+                if index == 0 {
+                    index += size;
+                    continue;
+                }
+                result += id as u64
+                    * ((index + size - 1) as u64 * (index + size) as u64 / 2
+                        - ((index - 1) * index) as u64 / 2);
+                index += size;
+            }
+        }
     }
-    print!("\n");
-    0
-}
-
-fn main() {
-    let fname = "data/test_input";
-    let result = solve_part_one(fname);
-    println!("Solution to part one: {result}");
-
-    // let mut disk_map = vec![Block::FreeSpace { size: 2 }];
-    // println!("{:?}", disk_map);
-    // reduce(&mut disk_map);
-    // println!("{:?}", disk_map);
-}
-
-fn reduce(disk_map: &mut Vec<Block>) {
-    match disk_map[0] {
-        Block::FreeSpace { ref mut size } => *size -= 1,
-        Block::File { id: _, size: _ } => {}
-    }
-    return ();
+    result
 }
