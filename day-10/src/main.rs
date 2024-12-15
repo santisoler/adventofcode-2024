@@ -10,6 +10,12 @@ mod tests {
         let result = solve_part_one(fname);
         assert_eq!(result, 36);
     }
+    #[test]
+    fn test_part_two() {
+        let fname = "data/test_input";
+        let result = solve_part_two(fname);
+        assert_eq!(result, 81);
+    }
 }
 
 const DELTAS: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
@@ -31,7 +37,20 @@ impl Topo {
         return &self.map[position.y][position.x];
     }
 
-    pub fn count_trails(&self, position: &Position, summits: &mut Vec<Position>) -> u32 {
+    pub fn get_trailheads(&self) -> Vec<Position> {
+        let mut trailheads: Vec<Position> = vec![];
+        for (i, row) in self.map.iter().enumerate() {
+            for (j, value) in row.iter().enumerate() {
+                if *value == 0 {
+                    trailheads.push(Position { x: j, y: i })
+                }
+            }
+        }
+        trailheads
+    }
+
+    pub fn get_trailhead_score(&self, position: &Position, summits: &mut Vec<Position>) -> u32 {
+        // count how many summits can be reached from this trailhead
         if *self.get(position) == 9 && !summits.contains(&position) {
             summits.push(position.clone());
             return 1;
@@ -39,7 +58,20 @@ impl Topo {
         let neighbors = self.get_trail_neighbours(position);
         let result = neighbors
             .iter()
-            .map(|n| self.count_trails(&n, summits))
+            .map(|n| self.get_trailhead_score(&n, summits))
+            .sum();
+        return result;
+    }
+
+    pub fn get_trailhead_rating(&self, position: &Position) -> u32 {
+        // count how many trails can be followed from this trailhead
+        if *self.get(position) == 9 {
+            return 1;
+        }
+        let neighbors = self.get_trail_neighbours(position);
+        let result = neighbors
+            .iter()
+            .map(|n| self.get_trailhead_rating(&n))
             .sum();
         return result;
     }
@@ -96,28 +128,29 @@ fn read_file(fname: &str) -> Topo {
 
 fn solve_part_one(fname: &str) -> u32 {
     let topo = read_file(fname);
-    let trailheads = {
-        let mut trailheads: Vec<Position> = vec![];
-        for (i, row) in topo.map.iter().enumerate() {
-            for (j, value) in row.iter().enumerate() {
-                if *value == 0 {
-                    trailheads.push(Position { x: j, y: i })
-                }
-            }
-        }
-        trailheads
-    };
+    let trailheads = topo.get_trailheads();
     trailheads
         .iter()
         .map(|t| {
             let mut summits: Vec<Position> = vec![];
-            topo.count_trails(t, &mut summits)
+            topo.get_trailhead_score(t, &mut summits)
         })
+        .sum()
+}
+
+fn solve_part_two(fname: &str) -> u32 {
+    let topo = read_file(fname);
+    let trailheads = topo.get_trailheads();
+    trailheads
+        .iter()
+        .map(|t| topo.get_trailhead_rating(t))
         .sum()
 }
 
 fn main() {
     let fname = "data/input";
     let result = solve_part_one(fname);
+    println!("Solution to part one: {result}");
+    let result = solve_part_two(fname);
     println!("Solution to part one: {result}");
 }
