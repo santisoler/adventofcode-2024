@@ -34,6 +34,36 @@ struct Plot {
     plant: char,
 }
 
+impl Plot {
+    fn was_visited(&self, visited: &Visited) -> bool {
+        return visited.map[self.y as usize][self.x as usize];
+    }
+
+    fn get_neighbors(&self, garden: &Garden) -> Vec<Plot> {
+        // Return a vec neighbors of the same plant type.
+        let nrows = garden.plants.len() as i32;
+        let ncols = garden.plants[0].len() as i32;
+        let mut neighbors = vec![];
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)].iter() {
+            if (self.x == 0 && *dx < 0) | (self.x == ncols - 1 && *dx > 0) {
+                continue;
+            }
+            if (self.y == 0 && *dy < 0) | (self.y == nrows - 1 && *dy > 0) {
+                continue;
+            }
+            let neighbor = Plot {
+                x: self.x + dx,
+                y: self.y + dy,
+                plant: garden.get_plant(self.x + dx, self.y + dy),
+            };
+            if neighbor.plant == self.plant {
+                neighbors.push(neighbor);
+            }
+        }
+        neighbors
+    }
+}
+
 struct Visited {
     map: Vec<Vec<bool>>,
 }
@@ -49,10 +79,6 @@ impl Visited {
 
     fn visit(&mut self, plot: &Plot) {
         self.map[plot.y as usize][plot.x as usize] = true;
-    }
-
-    fn was_visited(&self, plot: &Plot) -> bool {
-        return self.map[plot.y as usize][plot.x as usize];
     }
 }
 
@@ -73,11 +99,11 @@ impl Garden {
             // Pop last element in stack
             let plot = stack.pop().unwrap();
             // If we already visited this neighbor, just continue
-            if visited.was_visited(&plot) {
+            if plot.was_visited(visited) {
                 continue;
             };
             // Get neighbors of same type of plant
-            let neighbors = self.get_neighbors(&plot);
+            let neighbors = plot.get_neighbors(self);
             // Increase area on one, and perimeter as (4 - number of neighbors)
             area += 1;
             perimeter += 4 - neighbors.len() as u32;
@@ -86,7 +112,7 @@ impl Garden {
             // Add unvisited neighbors to the stack
             let unvisited_neighbors: Vec<Plot> = neighbors
                 .iter()
-                .filter(|n| !visited.was_visited(n))
+                .filter(|n| !n.was_visited(visited))
                 .map(|n| n.clone())
                 .collect();
             stack.extend(unvisited_neighbors);
@@ -104,30 +130,6 @@ impl Garden {
             y,
             plant: self.get_plant(x, y),
         }
-    }
-
-    fn get_neighbors(&self, plot: &Plot) -> Vec<Plot> {
-        // Return a vec neighbors of the same plant type.
-        let nrows = self.plants.len() as i32;
-        let ncols = self.plants[0].len() as i32;
-        let mut neighbors = vec![];
-        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)].iter() {
-            if (plot.x == 0 && *dx < 0) | (plot.x == ncols - 1 && *dx > 0) {
-                continue;
-            }
-            if (plot.y == 0 && *dy < 0) | (plot.y == nrows - 1 && *dy > 0) {
-                continue;
-            }
-            let neighbor = Plot {
-                x: plot.x + dx,
-                y: plot.y + dy,
-                plant: self.get_plant(plot.x + dx, plot.y + dy),
-            };
-            if neighbor.plant == plot.plant {
-                neighbors.push(neighbor);
-            }
-        }
-        neighbors
     }
 }
 
@@ -151,7 +153,7 @@ fn get_total_price(garden: &Garden) -> u32 {
     for y in 0..nrows {
         for x in 0..ncols {
             let plot = garden.get_plot(x as i32, y as i32);
-            if visited.was_visited(&plot) {
+            if plot.was_visited(&visited) {
                 continue;
             };
             let (area, perimeter) = garden.get_area_and_perimeter(plot, &mut visited);
