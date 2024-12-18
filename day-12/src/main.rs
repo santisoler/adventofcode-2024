@@ -1,4 +1,6 @@
 use std::fs;
+use std::time::Instant;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,37 +65,31 @@ impl Garden {
         Self { plants }
     }
 
-    pub fn get_area_and_perimeter(&self, plot: &Plot, visited: &mut Visited) -> (u32, u32) {
-        let (area, perimeter) = self.walk(plot, visited);
-        (area, perimeter)
-    }
-
-    fn walk(&self, plot: &Plot, visited: &mut Visited) -> (u32, u32) {
-        // If this plot was visited by another walk path return 0 area and 0
-        // perimeter to not count it twice.
-        if visited.was_visited(plot) {
-            return (0, 0);
-        }
-        // Walk the area of plots of the same plant type
-        let neighbors = self.get_neighbors(plot);
-        // Increase area on one, and perimeter as (4 - number of neighbors)
-        let mut area = 1;
-        let mut perimeter = 4 - neighbors.len() as u32;
-        // Mark this plot as visited
-        visited.visit(plot);
-        // Run this recursively to visit all plots of the same plant type
-        let unvisited_neighbors: Vec<Plot> = neighbors
-            .iter()
-            .filter(|n| !visited.was_visited(n))
-            .map(|n| n.clone())
-            .collect();
-        if unvisited_neighbors.len() == 0 {
-            return (area, perimeter);
-        }
-        for neighbor in unvisited_neighbors.iter() {
-            let (area_i, perimeter_i) = self.walk(neighbor, visited);
-            area += area_i;
-            perimeter += perimeter_i;
+    pub fn get_area_and_perimeter(&self, plot: Plot, visited: &mut Visited) -> (u32, u32) {
+        // Compute area and perimeter of a region of plots of same type
+        let (mut area, mut perimeter) = (0, 0);
+        let mut stack: Vec<Plot> = vec![plot];
+        while !stack.is_empty() {
+            // Pop last element in stack
+            let plot = stack.pop().unwrap();
+            // If we already visited this neighbor, just continue
+            if visited.was_visited(&plot) {
+                continue;
+            };
+            // Get neighbors of same type of plant
+            let neighbors = self.get_neighbors(&plot);
+            // Increase area on one, and perimeter as (4 - number of neighbors)
+            area += 1;
+            perimeter += 4 - neighbors.len() as u32;
+            // Mark this plot as visited
+            visited.visit(&plot);
+            // Add unvisited neighbors to the stack
+            let unvisited_neighbors: Vec<Plot> = neighbors
+                .iter()
+                .filter(|n| !visited.was_visited(n))
+                .map(|n| n.clone())
+                .collect();
+            stack.extend(unvisited_neighbors);
         }
         (area, perimeter)
     }
@@ -158,7 +154,7 @@ fn get_total_price(garden: &Garden) -> u32 {
             if visited.was_visited(&plot) {
                 continue;
             };
-            let (area, perimeter) = garden.get_area_and_perimeter(&plot, &mut visited);
+            let (area, perimeter) = garden.get_area_and_perimeter(plot, &mut visited);
             price += area * perimeter;
         }
     }
@@ -174,6 +170,9 @@ fn solve_part_one(fname: &str) -> u32 {
 
 fn main() {
     let fname = "data/input";
+    let start = Instant::now();
     let result = solve_part_one(fname);
+    let end = Instant::now();
     println!("Solution to part one: {result}");
+    println!("Elapsed time: {}s", (end - start).as_secs_f64());
 }
