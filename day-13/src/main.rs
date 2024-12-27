@@ -2,8 +2,9 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 
-const TOKENS_A: i32 = 3;
-const TOKENS_B: i32 = 1;
+const TOKENS_A: i64 = 3;
+const TOKENS_B: i64 = 1;
+const OFFSET: i64 = 10000000000000;
 
 #[cfg(test)]
 mod tests {
@@ -18,13 +19,13 @@ mod tests {
 }
 
 struct Button {
-    x: i32,
-    y: i32,
+    x: i64,
+    y: i64,
 }
 
 struct Prize {
-    x: i32,
-    y: i32,
+    x: i64,
+    y: i64,
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -36,7 +37,7 @@ where
 }
 
 fn read_button_line(line: String) -> Button {
-    let units: Vec<i32> = line
+    let units: Vec<i64> = line
         .split(":")
         .last()
         .unwrap()
@@ -49,22 +50,24 @@ fn read_button_line(line: String) -> Button {
     }
 }
 
-fn read_prize_line(line: String) -> Prize {
-    let units: Vec<i32> = line
+fn read_prize_line(line: String, with_offset: bool) -> Prize {
+    let units: Vec<i64> = line
         .split(":")
         .last()
         .unwrap()
         .split(",")
         .map(|x| x.trim().split("=").last().unwrap().parse().unwrap())
         .collect();
-    Prize {
-        x: units[0],
-        y: units[1],
+    let (mut x, mut y) = (units[0], units[1]);
+    if with_offset {
+        x += OFFSET;
+        y += OFFSET;
     }
+    Prize { x, y }
 }
 
 // Count the minimum number of tokens needed to get the prize
-fn count_tokens(a_button: Button, b_button: Button, prize: Prize) -> Option<i32> {
+fn count_tokens(a_button: Button, b_button: Button, prize: Prize) -> Option<i64> {
     // Solve the linear equations system to get the number of presses of each button needed to get
     // the prize.
     let det = a_button.x * b_button.y - b_button.x * a_button.y;
@@ -80,15 +83,11 @@ fn count_tokens(a_button: Button, b_button: Button, prize: Prize) -> Option<i32>
     if (a_presses < 0) | (b_presses < 0) {
         return None;
     }
-    // Limit the amount of times we can press each button
-    if (a_presses > 100) | (b_presses > 100) {
-        return None;
-    }
     let tokens = TOKENS_A * a_presses + TOKENS_B * b_presses;
     Some(tokens)
 }
 
-fn solve_part_one(fname: &str) -> i32 {
+fn get_total_number_of_tokens(fname: &str, with_offset: bool) -> i64 {
     let mut lines = match read_lines(fname) {
         Ok(lines) => lines.flatten(),
         Err(e) => panic!("{e}"),
@@ -104,7 +103,7 @@ fn solve_part_one(fname: &str) -> i32 {
             None => break,
         };
         let prize = match lines.next() {
-            Some(line) => read_prize_line(line),
+            Some(line) => read_prize_line(line, with_offset),
             None => break,
         };
         if let Some(tokens) = count_tokens(a_button, b_button, prize) {
@@ -117,8 +116,18 @@ fn solve_part_one(fname: &str) -> i32 {
     result
 }
 
+fn solve_part_one(fname: &str) -> i64 {
+    get_total_number_of_tokens(fname, false)
+}
+
+fn solve_part_two(fname: &str) -> i64 {
+    get_total_number_of_tokens(fname, true)
+}
+
 fn main() {
     let fname = "data/input";
     let result = solve_part_one(fname);
     println!("Solution to part one: {result}");
+    let result = solve_part_two(fname);
+    println!("Solution to part two: {result}");
 }
