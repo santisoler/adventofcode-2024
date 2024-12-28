@@ -136,11 +136,13 @@ fn solve_part_two(fname: &str) -> i32 {
 
 fn main() {
     let fname = "data/input";
+
     println!("------------");
     println!("| Part one |");
     println!("------------");
     let result = solve_part_one(fname);
     println!("Solution to part one: {result}");
+
     println!("\n------------");
     println!("| Part two |");
     println!("------------");

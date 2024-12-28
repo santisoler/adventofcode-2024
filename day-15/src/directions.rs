@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub enum Direction {
     Up,
@@ -24,5 +26,17 @@ impl Direction {
             '<' => Direction::Left,
             e => panic!("Inavlid direction character: {}", e),
         }
+    }
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            Direction::Up => "^",
+            Direction::Down => "v",
+            Direction::Right => ">",
+            Direction::Left => "<",
+        };
+        write!(f, "{}", string)
     }
 }

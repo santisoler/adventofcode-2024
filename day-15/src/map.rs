@@ -99,116 +99,141 @@ impl Map {
         }
     }
 
-    // Try to move a large box to a given direction.
-    // If the box was moved, return true. Else return false.
-    pub fn move_large_box(&mut self, direction: &Direction, x: i32, y: i32) -> bool {
+    // Return true if a given large box can be moved
+    pub fn can_move_large_box(&self, direction: &Direction, x: i32, y: i32) -> bool {
+        let box_side = match self.get(x, y) {
+            Some(c) => c,
+            None => panic!("Invalid location: {}, {}", x, y),
+        };
+        return match (box_side, direction) {
+            ('[', Direction::Right) => {
+                let x_next = x + 2;
+                match self.get(x_next, y) {
+                    Some('#') => false,
+                    Some('.') => true,
+                    Some('[') => self.can_move_large_box(direction, x_next, y),
+                    Some(e) => panic!("Invalid tile {} at {}, {}", e, x_next, y),
+                    None => panic!("Invalid location: {}, {}", x, y),
+                }
+            }
+            (']', Direction::Left) => {
+                let x_next = x - 2;
+                match self.get(x_next, y) {
+                    Some('#') => false,
+                    Some('.') => true,
+                    Some(']') => self.can_move_large_box(direction, x_next, y),
+                    Some(e) => panic!("Invalid tile {} at {}, {}", e, x_next, y),
+                    None => panic!("Invalid location: {}, {}", x, y),
+                }
+            }
+            ('[', Direction::Up) | ('[', Direction::Down) => {
+                let (_, y_next) = direction.get_next_position(x, y);
+                let left = match self.get(x, y_next) {
+                    Some(c) => c,
+                    None => panic!(""),
+                };
+                let right = match self.get(x + 1, y_next) {
+                    Some(c) => c,
+                    None => panic!(""),
+                };
+                match (left, right) {
+                    ('.', '.') => true,
+                    ('#', _) | (_, '#') => false,
+                    ('[', ']') => self.can_move_large_box(direction, x, y_next),
+                    (']', '[') => {
+                        let can_move_left = self.can_move_large_box(direction, x, y_next);
+                        let can_move_right = self.can_move_large_box(direction, x + 1, y_next);
+                        can_move_left && can_move_right
+                    }
+                    (']', '.') => self.can_move_large_box(direction, x, y_next),
+                    ('.', '[') => self.can_move_large_box(direction, x + 1, y_next),
+                    (l, r) => panic!("invalid {}, {}", l, r),
+                }
+            }
+            (']', Direction::Up) | (']', Direction::Down) => {
+                self.can_move_large_box(direction, x - 1, y)
+            }
+            (_, _) => {
+                panic!(
+                    "Cannot move tile {} in ({}, {}) to the {:?}",
+                    box_side, x, y, direction
+                )
+            }
+        };
+    }
+
+    // Move a large box to the given direction if possible.
+    // Return true if the box was moved, else false.
+    fn move_large_box(&mut self, direction: &Direction, x: i32, y: i32) -> bool {
+        // Check if the box can be moved, return false in that case
+        if !self.can_move_large_box(direction, x, y) {
+            return false;
+        }
+        // Move the box and their neigbors
         let box_side = match self.get(x, y) {
             Some(c) => c,
             None => panic!("Invalid location: {}, {}", x, y),
         };
         match (box_side, direction) {
-            ('[', Direction::Right) | (']', Direction::Left) => {
-                let (x_next, y_next) = direction.get_next_position(x, y);
-                let moved = self.move_large_box(direction, x_next, y_next);
-                if moved {
-                    self.write(x, y, '.');
-                    self.write(x_next, y_next, box_side);
+            ('[', Direction::Right) => {
+                if let Some('[') = self.get(x + 2, y) {
+                    self.move_large_box(direction, x + 2, y);
                 }
-                return moved;
+                self.write(x, y, '.');
+                self.write(x + 1, y, '[');
+                self.write(x + 2, y, ']');
             }
-            (']', Direction::Right) | ('[', Direction::Left) => {
-                let (x_next, y_next) = direction.get_next_position(x, y);
-                match self.get(x_next, y_next) {
-                    Some('#') => return false,
-                    Some('[') | Some(']') => {
-                        let moved = self.move_large_box(direction, x_next, y_next);
-                        if moved {
-                            self.write(x_next, y_next, box_side);
-                        }
-                        return moved;
-                    }
-                    Some('.') => {
-                        self.write(x_next, y_next, box_side);
-                        return true;
-                    }
-                    Some(e) => panic!("invalid char: {}", e),
-                    None => panic!("invalid location: {}, {}", x_next, y_next),
+            (']', Direction::Left) => {
+                if let Some(']') = self.get(x - 2, y) {
+                    self.move_large_box(direction, x - 2, y);
                 }
-            }
-            (']', Direction::Up) | (']', Direction::Down) => {
-                // let the next branch decide the vertical movement of the box
-                return self.move_large_box(direction, x - 1, y);
+                self.write(x, y, '.');
+                self.write(x - 1, y, ']');
+                self.write(x - 2, y, '[');
             }
             ('[', Direction::Up) | ('[', Direction::Down) => {
-                let (x_left, y_left) = direction.get_next_position(x, y);
-                let (x_right, y_right) = direction.get_next_position(x + 1, y);
-                let left = match self.get(x_left, y_left) {
+                // todo
+                let (_, y_next) = direction.get_next_position(x, y);
+                let left = match self.get(x, y_next) {
                     Some(c) => c,
-                    None => panic!("invalid location: {}, {}", x_left, y_left),
+                    None => panic!(""),
                 };
-                let right = match self.get(x_right, y_right) {
+                let right = match self.get(x + 1, y_next) {
                     Some(c) => c,
-                    None => panic!("invalid location: {}, {}", x_right, y_right),
+                    None => panic!(""),
                 };
                 match (left, right) {
-                    ('#', _) | (_, '#') => return false,
-                    ('[', ']') => {
-                        let moved = self.move_large_box(direction, x_left, y_left);
-                        if moved {
-                            self.write(x, y, '.');
-                            self.write(x + 1, y, '.');
-                            self.write(x_left, y_left, '[');
-                            self.write(x_right, y_right, ']');
-                        }
-                        return moved;
-                    }
-                    (']', '[') => {
-                        let moved_left = self.move_large_box(direction, x_left, y_left);
-                        let moved_right = self.move_large_box(direction, x_right, y_right);
-                        let moved = moved_left && moved_right;
-                        if moved {
-                            self.write(x, y, '.');
-                            self.write(x + 1, y, '.');
-                            self.write(x_left, y_left, '[');
-                            self.write(x_right, y_right, ']');
-                        }
-                        return moved;
+                    ('.', '[') => {
+                        self.move_large_box(direction, x + 1, y_next);
                     }
                     (']', '.') => {
-                        let moved_left = self.move_large_box(direction, x_left, y_left);
-                        if moved_left {
-                            self.write(x, y, '.');
-                            self.write(x + 1, y, '.');
-                            self.write(x_left, y_left, '[');
-                            self.write(x_right, y_right, ']');
-                        }
-                        return moved_left;
+                        self.move_large_box(direction, x, y_next);
                     }
-                    ('.', '[') => {
-                        let moved_right = self.move_large_box(direction, x_right, y_right);
-                        if moved_right {
-                            self.write(x, y, '.');
-                            self.write(x + 1, y, '.');
-                            self.write(x_left, y_left, '[');
-                            self.write(x_right, y_right, ']');
-                        }
-                        return moved_right;
+                    ('[', ']') => {
+                        self.move_large_box(direction, x, y_next);
                     }
-                    ('.', '.') => {
-                        self.write(x, y, '.');
-                        self.write(x + 1, y, '.');
-                        self.write(x_left, y_left, '[');
-                        self.write(x_right, y_right, ']');
-                        return true;
+                    (']', '[') => {
+                        self.move_large_box(direction, x, y_next);
+                        self.move_large_box(direction, x + 1, y_next);
                     }
-                    (l, r) => panic!("invalid chars: {}, {}", l, r),
+                    (_, _) => (),
                 }
+                self.write(x, y, '.');
+                self.write(x + 1, y, '.');
+                self.write(x, y_next, '[');
+                self.write(x + 1, y_next, ']');
             }
-            (_, _) => panic!(
-                "Tried to move a tile that doesn't have a box: {} {} {}",
-                x, y, box_side
-            ),
-        }
+            (']', Direction::Up) | (']', Direction::Down) => {
+                self.move_large_box(direction, x - 1, y);
+            }
+            (_, _) => {
+                panic!(
+                    "Cannot move tile {} in ({}, {}) to the {:?}",
+                    box_side, x, y, direction
+                )
+            }
+        };
+        true
     }
 
     pub fn print(&self, robot: &Robot) {
