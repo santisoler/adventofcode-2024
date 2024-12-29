@@ -1,133 +1,102 @@
-use std::cmp::Ordering;
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap};
-use std::fs;
-use std::time::Instant;
+use std::collections::BinaryHeap;
+
+use crate::directions::{Direction, Orientation};
+use crate::maze::Maze;
+use crate::tile::Tile;
+
+mod directions;
+mod maze;
+mod tile;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_part_one_example_one() {
+        let fname = "data/test_input";
+        let result = solve_part_one(fname);
+        assert_eq!(result, 7036);
+    }
+    #[test]
+    fn test_part_one_example_two() {
+        let fname = "data/test_input_2";
+        let result = solve_part_one(fname);
+        assert_eq!(result, 11048);
+    }
+}
 
 const DIRECTIONS: [Direction; 3] = [Direction::Forward, Direction::Right, Direction::Left];
 
-struct Maze {
-    map: Vec<Vec<char>>,
+pub struct Visited {
+    visited: [Vec<Vec<bool>>; 4],
 }
 
-impl Maze {
-    // Create new maze from input file
-    fn new_from(fname: &str) -> Self {
-        let content = fs::read_to_string(fname).unwrap();
-        let mut map: Vec<Vec<char>> = vec![];
-        for line in content.lines() {
-            let row = line.chars().collect();
-            map.push(row);
-        }
-        Self { map }
-    }
-
-    // Get start position
-    fn get_start(&self) -> (usize, usize) {
-        let j = self.map.len() - 2; // S is always in the previous to last row
-        let i = self.map[j].iter().position(|c| *c == 'S').unwrap();
-        (i, j)
-    }
-
-    // Get end position
-    fn get_end(&self) -> (usize, usize) {
-        let j = 1; // S is always in the second row
-        let i = self.map[j].iter().position(|c| *c == 'E').unwrap();
-        (i, j)
-    }
-}
-
-enum Direction {
-    Forward,
-    Right,
-    Left,
-}
-
-impl Direction {
-    fn as_int(&self) -> i32 {
-        match self {
-            Direction::Forward => 0,
-            Direction::Right => 1,
-            Direction::Left => -1,
-        }
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-enum Orientation {
-    North,
-    South,
-    East,
-    West,
-}
-
-impl Orientation {
-    fn rotate(&self, direction: &Direction) -> Self {
-        self.from_int(self.as_int() + direction.as_int())
-    }
-
-    fn as_int(&self) -> i32 {
-        match self {
-            Orientation::North => 0,
-            Orientation::East => 1,
-            Orientation::South => 2,
-            Orientation::West => 3,
+impl Visited {
+    pub fn new_from(maze: &Maze) -> Self {
+        let nrows = maze.map.len();
+        let ncols = maze.map[0].len();
+        let visited_n = vec![vec![false; ncols]; nrows];
+        let visited_s = vec![vec![false; ncols]; nrows];
+        let visited_e = vec![vec![false; ncols]; nrows];
+        let visited_w = vec![vec![false; ncols]; nrows];
+        Self {
+            visited: [visited_n, visited_e, visited_s, visited_w],
         }
     }
 
-    fn from_int(&self, integer: i32) -> Self {
-        match integer.rem_euclid(4) {
-            0 => Orientation::North,
-            1 => Orientation::East,
-            2 => Orientation::South,
-            3 => Orientation::West,
-            _ => panic!("Invalid integer {integer}"),
+    pub fn was_visited(&self, x: usize, y: usize, orientation: Orientation) -> bool {
+        self.visited[orientation.as_int() as usize][y][x]
+    }
+
+    pub fn visit(&mut self, x: usize, y: usize, orientation: Orientation) {
+        self.visited[orientation.as_int() as usize][y][x] = true;
+    }
+}
+
+pub struct Scores {
+    scores: [Vec<Vec<u32>>; 4],
+}
+
+impl Scores {
+    pub fn new_from(maze: &Maze) -> Self {
+        let nrows = maze.map.len();
+        let ncols = maze.map[0].len();
+        let scores_n = vec![vec![u32::MAX; ncols]; nrows];
+        let scores_s = vec![vec![u32::MAX; ncols]; nrows];
+        let scores_e = vec![vec![u32::MAX; ncols]; nrows];
+        let scores_w = vec![vec![u32::MAX; ncols]; nrows];
+        Self {
+            scores: [scores_n, scores_e, scores_s, scores_w],
         }
     }
-}
 
-struct Tile {
-    x: usize,
-    y: usize,
-    score: u32,
-    orientation: Orientation,
-}
+    pub fn get(&self, x: usize, y: usize, orientation: Orientation) -> u32 {
+        self.scores[orientation.as_int() as usize][y][x]
+    }
 
-// Need to implement the Ord trait for Tile so it can be used in the BinaryHeap.
-impl Ord for Tile {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.score.cmp(&other.score)
+    pub fn write(&mut self, x: usize, y: usize, orientation: Orientation, score: u32) {
+        self.scores[orientation.as_int() as usize][y][x] = score;
     }
 }
-
-impl PartialOrd for Tile {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for Tile {
-    fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
-    }
-}
-
-impl Eq for Tile {}
 
 fn get_lowest_score(fname: &str) -> Result<u32, &str> {
+    // Read maze and get start and end positions
     let maze = Maze::new_from(fname);
-
     let start = maze.get_start();
     let end = maze.get_end();
 
-    // Define HashMaps for storing the scores and the visted tiles.
-    // It's important tha these hashmaps also consider the orientation of the tiles, and not just
-    // their positions. Two tiles with same position but different orientations should be treated
-    // differently. It's like the maze in four folds: one for each direction.
+    // Define structs to store scores of each tile and to mark if they were visited or not.
+    // In these structs, each tile is defined by their position and their orientation.
+    // Two tiles in the same location but different position should be treated as different.
     // Failing to do so would not result in the lowest score.
-    let mut scores = HashMap::<(usize, usize, Orientation), u32>::new();
-    let mut visited = HashMap::<(usize, usize, Orientation), bool>::new();
+    let mut scores = Scores::new_from(&maze);
+    let mut visited = Visited::new_from(&maze);
 
+    // Initialize heap with the start tile.
+    // We need to define the heap with elements of Reverse<Tile> so the heap is a min-heap, and not
+    // a max-heap (as it is by default).
     let mut heap = BinaryHeap::<Reverse<Tile>>::new();
     let start_tile = Tile {
         x: start.0,
@@ -135,8 +104,10 @@ fn get_lowest_score(fname: &str) -> Result<u32, &str> {
         score: 0,
         orientation: Orientation::East,
     };
-    scores.insert(
-        (start_tile.x, start_tile.y, start_tile.orientation),
+    scores.write(
+        start_tile.x,
+        start_tile.y,
+        start_tile.orientation,
         start_tile.score,
     );
     heap.push(Reverse(start_tile));
@@ -146,10 +117,7 @@ fn get_lowest_score(fname: &str) -> Result<u32, &str> {
         let tile = heap.pop().unwrap().0;
 
         // Mark as visited
-        visited
-            .entry((tile.x, tile.y, tile.orientation))
-            .and_modify(|v| *v = true)
-            .or_insert(true);
+        visited.visit(tile.x, tile.y, tile.orientation);
 
         // If target tile, return score
         if (tile.x, tile.y) == end {
@@ -158,29 +126,18 @@ fn get_lowest_score(fname: &str) -> Result<u32, &str> {
 
         for direction in DIRECTIONS {
             // Get the neighboring tile
-            let orientation = tile.orientation.rotate(&direction);
-            let (x, y) = match orientation {
-                Orientation::East => (tile.x + 1, tile.y),
-                Orientation::West => (tile.x - 1, tile.y),
-                Orientation::North => (tile.x, tile.y - 1),
-                Orientation::South => (tile.x, tile.y + 1),
-            };
+            let (x, y, orientation) = tile.get_neighbor(&direction);
             // Skip if neighbor is a wall or if it was already visited
-            if maze.map[y][x] == '#' {
+            if maze.map[y][x] == '#' || visited.was_visited(x, y, orientation) {
                 continue;
             };
-            if visited.contains_key(&(x, y, orientation)) {
-                continue;
-            }
             // Compute the score of the neighbor tile
             let score = match direction {
                 Direction::Forward => tile.score + 1,
                 Direction::Left | Direction::Right => tile.score + 1 + 1000,
             };
-            // If we found a path that leads to the neighbor tile with a
-            // lower score, add it to the heap.
-            let key = (x, y, orientation);
-            if !scores.contains_key(&key) || (score < *scores.get(&key).unwrap()) {
+            // Override score if we found a smaller one.
+            if score < scores.get(x, y, orientation) {
                 let neighbor = Tile {
                     x,
                     y,
@@ -188,10 +145,7 @@ fn get_lowest_score(fname: &str) -> Result<u32, &str> {
                     orientation,
                 };
                 heap.push(Reverse(neighbor));
-                scores
-                    .entry(key)
-                    .and_modify(|s| *s = score)
-                    .or_insert(score);
+                scores.write(x, y, orientation, score)
             }
         }
     }
@@ -207,10 +161,6 @@ fn solve_part_one(fname: &str) -> u32 {
 
 fn main() {
     let fname = "data/input";
-    let start = Instant::now();
     let result = solve_part_one(fname);
-    let end = Instant::now();
     println!("Solution to part one: {result}");
-    println!("Estimated time: {}s", (end - start).as_secs_f64());
-    println!("Estimated time: {}ms", (end - start).as_millis());
 }
