@@ -2,7 +2,6 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::fs;
 
-// const MAP_SIZE: usize = 6 + 1;
 const MAP_SIZE: usize = 70 + 1;
 const DELTAS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
@@ -147,8 +146,40 @@ fn solve_part_one(fname: &str) -> u32 {
     }
 }
 
+fn solve_part_two(fname: &str) -> (usize, usize) {
+    let bytes = read_file(fname);
+    let mut corrupted = Map::new(false);
+    let start = (0, 0);
+    let end = (MAP_SIZE - 1, MAP_SIZE - 1);
+    // Make the first kilobyte fall (mark those positions as corrupted)
+    for byte in bytes[0..1024].iter() {
+        corrupted.write(byte, true)
+    }
+    // Iterate over the next bytes and see when we get the one that blocks the exit.
+    let blocking_byte = {
+        let mut blocking_byte = None;
+        for byte in bytes[1024..].iter() {
+            corrupted.write(byte, true);
+            match get_minimum_distance(&corrupted, start, end) {
+                Ok(_) => (),
+                Err(_) => {
+                    blocking_byte = Some(byte);
+                    break;
+                }
+            }
+        }
+        blocking_byte
+    };
+    match blocking_byte {
+        Some(b) => *b,
+        None => panic!("Couldn't find a byte that blocks the exit"),
+    }
+}
+
 fn main() {
     let fname = "data/input";
     let result = solve_part_one(fname);
     println!("Solution to part one: {result}");
+    let result = solve_part_two(fname);
+    println!("Solution to part two: {},{}", result.0, result.1);
 }
