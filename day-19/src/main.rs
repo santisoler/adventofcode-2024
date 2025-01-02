@@ -1,5 +1,7 @@
+use std::cmp::min;
 use std::collections::HashSet;
 use std::fs;
+use std::time::Instant;
 
 #[cfg(test)]
 mod tests {
@@ -10,6 +12,13 @@ mod tests {
         let fname = "data/test_input";
         let result = solve_part_one(fname);
         assert_eq!(result, 6);
+    }
+
+    #[test]
+    fn test_part_two() {
+        let fname = "data/test_input";
+        let result = solve_part_two(fname);
+        assert_eq!(result, 16);
     }
 }
 
@@ -48,11 +57,8 @@ impl Patterns {
         if design.is_empty() {
             return true;
         }
-        for n_colors in 1..=self.max_stripes {
-            // Don't check pattern if the design has less colors that current value of n_colors
-            if design.len() < n_colors {
-                continue;
-            }
+        let max_stripes = min(self.max_stripes, design.len());
+        for n_colors in 1..=max_stripes {
             // Check if there's a pattern we can use to start building the design. If so, run this
             // recursively, checking if the rest of the design is also possible.
             if self.patterns.contains(&design[0..n_colors]) {
@@ -62,6 +68,21 @@ impl Patterns {
             }
         }
         false
+    }
+
+    /// Count in how many possible ways a design can be built with the available patterns.
+    pub fn count_possible_ways(&self, design: &str) -> u32 {
+        if design.is_empty() {
+            return 1;
+        }
+        let mut n_ways = 0;
+        let max_stripes = min(self.max_stripes, design.len());
+        for n_colors in 1..=max_stripes {
+            if self.patterns.contains(&design[0..n_colors]) {
+                n_ways += self.count_possible_ways(&design[n_colors..]);
+            }
+        }
+        n_ways
     }
 }
 
@@ -84,10 +105,6 @@ fn read_file(fname: &str) -> (Patterns, Vec<String>) {
 
 fn solve_part_one(fname: &str) -> u32 {
     let (patterns, designs) = read_file(fname);
-    // println!("{:?}", patterns);
-    // for design in designs.iter() {
-    //     println!("{}, {}", design, patterns.is_possible(&design));
-    // }
     let n_possible_designs = designs
         .iter()
         .map(|d| patterns.is_possible(&d))
@@ -97,8 +114,27 @@ fn solve_part_one(fname: &str) -> u32 {
     n_possible_designs
 }
 
+fn solve_part_two(fname: &str) -> u32 {
+    let (patterns, designs) = read_file(fname);
+    let n_possible_ways = designs
+        .iter()
+        .map(|d| patterns.count_possible_ways(&d))
+        .sum();
+    n_possible_ways
+}
+
 fn main() {
     let fname = "data/input";
+    let start = Instant::now();
     let result = solve_part_one(fname);
+    let end = Instant::now();
     println!("Solution to part one: {result}");
+    println!("Elapsed time: {:.2e}s", (end - start).as_secs_f64());
+
+    let fname = "data/test_input";
+    let start = Instant::now();
+    let result = solve_part_two(fname);
+    let end = Instant::now();
+    println!("Solution to part two: {result}");
+    println!("Elapsed time: {:.2e}s", (end - start).as_secs_f64());
 }
