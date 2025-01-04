@@ -154,6 +154,7 @@ fn count_cheats_from(
     let mut times_saved = HashSet::<u32>::new();
     // Define a stack of walls and the cheat time it takes to get to them
     let mut walls: Vec<(Point, u32)> = vec![];
+    let mut visited = Map::new(map.nrows(), map.ncols(), false);
     // Initialize the stack with the wall neighbors of the current point
     let wall_neighbors = map
         .get_neighbors(&point)
@@ -161,16 +162,20 @@ fn count_cheats_from(
         .filter(|n| map.is_wall(n))
         .collect::<Vec<Point>>();
     for n in wall_neighbors.into_iter() {
-        walls.push((n, 1))
+        walls.push((n, 1));
     }
     while !walls.is_empty() {
-        // println!("walls: {:?}", walls);
+        // println!("walls len: {}", walls.len());
         let (wall, cheat_time) = walls.pop().unwrap();
         if cheat_time >= max_cheat_time {
             continue;
         }
+        visited.write(&wall, true);
 
         for neighbor in map.get_neighbors(&wall) {
+            if visited.get(&neighbor) {
+                continue;
+            };
             if map.is_wall(&neighbor) {
                 walls.push((neighbor, cheat_time + 1))
             } else {
@@ -209,19 +214,6 @@ fn count_cheats_by_saved_time(
     cheats
 }
 
-// fn count_total_cheats(
-//     path: &Path,
-//     map: &Map<char>,
-//     times: &Map<Option<u32>>,
-//     max_cheat_time: u32,
-// ) -> u32 {
-//     let mut n_cheats = 0;
-//     for point in path.iter() {
-//         n_cheats += count_cheats_from(point, map, times, max_cheat_time);
-//     }
-//     n_cheats
-// }
-
 fn solve_part_one(fname: &str) -> u32 {
     let map = parse_file(fname);
     let (path, times) = get_path_and_times(&map);
@@ -229,8 +221,8 @@ fn solve_part_one(fname: &str) -> u32 {
 }
 
 fn solve_part_two(fname: &str) -> u32 {
-    let max_cheat_time = 2;
-    let threshold = 0;
+    let max_cheat_time = 20;
+    let threshold = 50;
     let map = parse_file(fname);
     let (path, times) = get_path_and_times(&map);
     let cheats = count_cheats_by_saved_time(&path, &map, &times, max_cheat_time);
@@ -255,4 +247,13 @@ fn main() {
 
     let result = solve_part_two(fname);
     println!("Solution to part two: {result}");
+
+    // ----------
+    // let max_cheat_time = 20;
+    // let threshold = 0;
+    // let map = parse_file(fname);
+    // let (_, times) = get_path_and_times(&map);
+    // let point = map.find('S').unwrap();
+    // let times_saved = count_cheats_from(&point, &map, &times, max_cheat_time);
+    // println!("times_saved: {:?}", times_saved);
 }
