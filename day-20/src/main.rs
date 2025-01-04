@@ -1,4 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
+
 type Point = (usize, usize);
 type Path = Vec<Point>;
 
@@ -57,6 +59,12 @@ impl<T: Copy + Eq + PartialEq> Map<T> {
             ));
         }
         neighbors
+    }
+}
+
+impl Map<char> {
+    fn is_wall(&self, point: &Point) -> bool {
+        self.map[point.1][point.0] == '#'
     }
 }
 
@@ -132,14 +140,119 @@ fn count_cheats(map: &Map<char>, path: &Path, times: &Map<Option<u32>>, threshol
     n_cheats
 }
 
+/// Count how many cheats can be used from a given star point.
+fn count_cheats_from(
+    point: &Point,
+    map: &Map<char>,
+    times: &Map<Option<u32>>,
+    max_cheat_time: u32,
+) -> Vec<u32> {
+    // Define the time of the starting point
+    let start_time = times.get(&point).unwrap();
+    // Define a vec where we are going to store the times that can be saved using cheats that start
+    // from this point.
+    let mut times_saved = HashSet::<u32>::new();
+    // Define a stack of walls and the cheat time it takes to get to them
+    let mut walls: Vec<(Point, u32)> = vec![];
+    // Initialize the stack with the wall neighbors of the current point
+    let wall_neighbors = map
+        .get_neighbors(&point)
+        .into_iter()
+        .filter(|n| map.is_wall(n))
+        .collect::<Vec<Point>>();
+    for n in wall_neighbors.into_iter() {
+        walls.push((n, 1))
+    }
+    while !walls.is_empty() {
+        // println!("walls: {:?}", walls);
+        let (wall, cheat_time) = walls.pop().unwrap();
+        if cheat_time >= max_cheat_time {
+            continue;
+        }
+
+        for neighbor in map.get_neighbors(&wall) {
+            if map.is_wall(&neighbor) {
+                walls.push((neighbor, cheat_time + 1))
+            } else {
+                let end_time = times.get(&neighbor).unwrap();
+                let saved_time: i32 = end_time as i32 - start_time as i32 - (cheat_time + 1) as i32;
+                // println!(
+                //     "neighbor: {:?}, end_time: {end_time}, saved_time: {saved_time}",
+                //     neighbor
+                // );
+                if saved_time > 0 {
+                    times_saved.insert(saved_time as u32);
+                }
+            }
+        }
+    }
+    // println!("times_saved: {:?}", times_saved);
+    times_saved.into_iter().collect::<Vec<u32>>()
+}
+
+fn count_cheats_by_saved_time(
+    path: &Path,
+    map: &Map<char>,
+    times: &Map<Option<u32>>,
+    max_cheat_time: u32,
+) -> HashMap<u32, u32> {
+    let mut cheats = HashMap::<u32, u32>::new();
+    for point in path.iter() {
+        let times_saved = count_cheats_from(&point, map, times, max_cheat_time);
+        for time_saved in times_saved.into_iter() {
+            cheats
+                .entry(time_saved)
+                .and_modify(|n| *n += 1)
+                .or_insert(1);
+        }
+    }
+    cheats
+}
+
+// fn count_total_cheats(
+//     path: &Path,
+//     map: &Map<char>,
+//     times: &Map<Option<u32>>,
+//     max_cheat_time: u32,
+// ) -> u32 {
+//     let mut n_cheats = 0;
+//     for point in path.iter() {
+//         n_cheats += count_cheats_from(point, map, times, max_cheat_time);
+//     }
+//     n_cheats
+// }
+
 fn solve_part_one(fname: &str) -> u32 {
     let map = parse_file(fname);
     let (path, times) = get_path_and_times(&map);
     count_cheats(&map, &path, &times, 100)
 }
 
+fn solve_part_two(fname: &str) -> u32 {
+    let max_cheat_time = 2;
+    let threshold = 0;
+    let map = parse_file(fname);
+    let (path, times) = get_path_and_times(&map);
+    let cheats = count_cheats_by_saved_time(&path, &map, &times, max_cheat_time);
+    for (saved_time, count) in cheats.iter() {
+        if *saved_time >= threshold {
+            println!("{}: {}", saved_time, count)
+        }
+    }
+    let n_cheats = cheats
+        .iter()
+        .filter(|(saved_time, _)| **saved_time >= threshold)
+        .map(|(_, count)| count)
+        .sum();
+    n_cheats
+}
+
 fn main() {
-    let fname = "data/input";
+    // let fname = "data/input";
+    let fname = "data/test_input";
     let result = solve_part_one(fname);
     println!("Solution to part one: {result}");
+
+    let result = solve_part_two(fname);
+    println!("Solution to part two: {result}");
 }
