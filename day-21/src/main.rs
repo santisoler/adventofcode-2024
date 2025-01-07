@@ -1,4 +1,5 @@
 use itertools::{repeat_n, Itertools};
+use memoize::memoize;
 use std::fs;
 
 #[cfg(test)]
@@ -22,6 +23,23 @@ enum Keypad {
 }
 
 impl Keypad {
+    fn new_from(code: &str) -> Self {
+        let is_numeric = {
+            let mut is_numeric = true;
+            for c in code.chars() {
+                if c != 'A' && !c.is_numeric() {
+                    is_numeric = false;
+                    break;
+                }
+            }
+            is_numeric
+        };
+        match is_numeric {
+            true => Keypad::Numeric,
+            false => Keypad::Directional,
+        }
+    }
+
     /// Get all possible sequences to get from the start key to the end key.
     ///
     /// These sequences are all valid (visit only valid keys) and all are the shortest paths to get
@@ -45,26 +63,6 @@ impl Keypad {
             .collect();
         for sequence in sequences.iter_mut() {
             sequence.push('A')
-        }
-        sequences
-    }
-
-    /// Get all possible sequences to type a full code.
-    ///
-    /// These sequences are all valid (visit only valid keys) and all are the shortest paths to get
-    /// to enter the code. We assume that the initial possition is at `A`, regardless of the type
-    /// of keypad.
-    fn get_full_sequences(&self, code: &str) -> Vec<String> {
-        let mut sequences = self.get_partial_sequences('A', code.chars().next().unwrap());
-        for (start, end) in code.chars().tuple_windows() {
-            let next_sequences = self.get_partial_sequences(start, end);
-            let mut sequences_tmp = vec![];
-            for mov in sequences.iter() {
-                for next in next_sequences.iter() {
-                    sequences_tmp.push(mov.clone() + next)
-                }
-            }
-            sequences = sequences_tmp;
         }
         sequences
     }
@@ -142,41 +140,55 @@ fn walk(position: &Position, sequence: char) -> Position {
     }
 }
 
-fn get_sequences(start: char, end: char, keypads: &[Keypad]) -> Vec<String> {
-    // Get first inner keypad
-    let keypad = &keypads[0];
-    // Handle when we found the innermost keypad
-    if keypads.len() == 1 {
-        return keypad.get_partial_sequences(start, end);
-    };
-    let mut sequences = vec![];
-    for inner_sequences in get_sequences(start, end, &keypads[1..]) {
-        sequences.extend(keypad.get_full_sequences(&inner_sequences))
-    }
-    sequences
+/// Prepend a string with a single character.
+fn prepend(code: &str, leading: char) -> String {
+    String::from(format!("{leading}")) + code
 }
 
-/// Compute the length of the shortest sequence by splitting the code in pairs.
-fn get_length_of_shortest_sequence(code: &str, keypads: &[Keypad]) -> u32 {
-    let mut length = 0 as u32;
-    // Any sequence starts with the initial position in A, so first we need to
-    // move from A to the first numeric key in the code.
-    let sequences = get_sequences('A', code.chars().next().unwrap(), keypads);
-    length += sequences.iter().map(|s| s.len() as u32).min().unwrap();
-    // Do the same for any pair of characters in the code (as moving windows)
-    for (start, end) in code.chars().tuple_windows() {
-        let sequences = get_sequences(start, end, keypads);
-        length += sequences.iter().map(|s| s.len() as u32).min().unwrap();
+/// Get the shortest sequence we need to input in the directional keypad to produce the desired
+/// code.
+///
+/// The `n_keypads` is the total number of keypads operated by a robot, including the numeric one.
+/// So, if we have Keypad -> Keypad -> Keypad -> Numpad, where we can type our sequence in the
+/// first one, we have a total of 3 keypads controlled by a robot.
+///
+/// We memoize this function to significatnly speed up the computation: since there will be a lot
+/// of repeated sequences that will be passed to this function in the recursion, it's best to cache
+/// the results rather than repeating the computation (which is costly specially when `n_keypads`
+/// is a high number).
+#[memoize]
+fn get_shortest_length(code: String, n_keypads: u32) -> u64 {
+    // Generate the keypad based on the code: the code will be numeric, so the first keypad should
+    // be also numeric.
+    let keypad = Keypad::new_from(&code);
+    if n_keypads == 0 {
+        return code.len() as u64;
     }
-    length
+    // Prepend an A to the code: all robots start a code in the A key.
+    let code = prepend(&code, 'A');
+    // Find shortest length recursively, iterating over pair of chars (moving windows).
+    let mut shortest_length = 0;
+    for (start, end) in code.chars().tuple_windows() {
+        // Get all possible sequences to generate that code
+        let sequences = keypad.get_partial_sequences(start, end);
+        // Get the minimum length of the sequence at the last keymap (recursively)
+        let min_length = sequences
+            .iter()
+            .map(|sequence| get_shortest_length(sequence.to_string(), n_keypads - 1))
+            .min()
+            .unwrap();
+        // Add the minimum length to the running result
+        shortest_length += min_length;
+    }
+    shortest_length
 }
 
 /// Compute the complexity of a given code.
 /// The complexity of a code its defined as the product of the lenght of the shortest sequence and
 /// the numerical part of the code.
-fn get_complexity(code: &str, keypads: &[Keypad]) -> u32 {
-    let min_length = get_length_of_shortest_sequence(code, keypads);
-    let numeric_part: u32 = code
+fn get_complexity(code: &str, n_keypads: u32) -> u64 {
+    let min_length = get_shortest_length(code.to_string(), n_keypads);
+    let numeric_part: u64 = code
         .chars()
         .filter(|c| c.is_digit(10))
         .collect::<String>()
@@ -185,13 +197,24 @@ fn get_complexity(code: &str, keypads: &[Keypad]) -> u32 {
     numeric_part * min_length
 }
 
-fn solve_part_one(fname: &str) -> u32 {
+fn solve_part_one(fname: &str) -> u64 {
     let content = fs::read_to_string(fname).unwrap();
     let codes = content.lines().collect::<Vec<&str>>();
-    let keypads = [Keypad::Directional, Keypad::Directional, Keypad::Numeric];
+    let n_keypads = 3;
     let complexities = codes
         .iter()
-        .map(|code| get_complexity(code, &keypads))
+        .map(|code| get_complexity(code, n_keypads))
+        .sum();
+    complexities
+}
+
+fn solve_part_two(fname: &str) -> u64 {
+    let content = fs::read_to_string(fname).unwrap();
+    let codes = content.lines().collect::<Vec<&str>>();
+    let n_keypads = 26;
+    let complexities = codes
+        .iter()
+        .map(|code| get_complexity(code, n_keypads))
         .sum();
     complexities
 }
@@ -200,4 +223,6 @@ fn main() {
     let fname = "data/input";
     let result = solve_part_one(fname);
     println!("Solution to part one: {result}");
+    let result = solve_part_two(fname);
+    println!("Solution to part two: {result}");
 }
