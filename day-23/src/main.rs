@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::time::Instant;
 
 #[cfg(test)]
 mod tests {
@@ -15,17 +16,17 @@ mod tests {
 
 type Set = Vec<String>;
 
-struct Network {
+pub struct Network {
     net: BTreeMap<String, Set>,
 }
 
 impl Network {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let net = BTreeMap::new();
         Self { net }
     }
 
-    fn insert(&mut self, a: &str, b: &str) {
+    pub fn insert(&mut self, a: &str, b: &str) {
         // Sort the two computers alphabetically
         let mut pair = [a, b];
         pair.sort();
@@ -36,61 +37,39 @@ impl Network {
             .or_insert(vec![b.to_string()]);
     }
 
-    fn get(&self, a: &str) -> Option<&Set> {
+    pub fn get(&self, a: &str) -> Option<&Set> {
         self.net.get(a)
     }
+
+    fn are_connected(&self, a: &str, b: &str) -> bool {
+        // Sort the two computers alphabetically
+        let mut pair = [a, b];
+        pair.sort();
+        let [a, b] = pair;
+        let connections = match self.get(a) {
+            None => return false,
+            Some(c) => c,
+        };
+        connections.contains(&b.to_string())
+    }
 }
 
-fn find_loops_recursive(
-    network: &Network,
-    computer: &str,
-    targets: &Vec<String>,
-    loop_len: usize,
-) -> Option<Vec<Set>> {
-    // use 1 to make the loop_len match the len of the loop
-    if loop_len == 1 {
-        if targets.contains(&computer.to_string()) {
-            let set = vec![computer.to_string()];
-            return Some(vec![set]);
-        };
-        return None;
-    };
-    let mut loops = vec![vec![]];
-    let connections = match network.get(computer) {
-        None => return None,
-        Some(c) => c,
-    };
-    for connection in connections.iter() {
-        let mut sets = match find_loops_recursive(network, connection, targets, loop_len - 1) {
-            None => continue,
-            Some(sets) => sets,
-        };
-        for set in sets.iter_mut() {
-            set.push(computer.to_string())
+/// Count the number of subnets of length 3 that includes a computer that starts with 't'.
+fn count_subnets_len_3_with_t(network: &Network) -> u32 {
+    let mut n_subnets = 0;
+    for (computer, connections) in network.net.iter() {
+        for (i, computer_a) in connections.iter().enumerate() {
+            for computer_b in connections[i + 1..].iter() {
+                let any_with_t = computer.starts_with('t')
+                    || computer_a.starts_with('t')
+                    || computer_b.starts_with('t');
+                if any_with_t && network.are_connected(computer_a, computer_b) {
+                    n_subnets += 1;
+                }
+            }
         }
-        loops.extend(sets);
     }
-    loops = loops
-        .into_iter()
-        .filter(|set| set.len() == loop_len)
-        .collect();
-    Some(loops)
-}
-
-fn find_loops(network: &Network, loop_len: usize) -> Vec<Set> {
-    let mut loops = vec![];
-    for computer in network.net.keys() {
-        let targets = match network.get(&computer) {
-            Some(t) => t,
-            None => continue,
-        };
-        let new_loops = match find_loops_recursive(&network, &computer, targets, loop_len) {
-            None => continue,
-            Some(l) => l,
-        };
-        loops.extend(new_loops);
-    }
-    loops
+    n_subnets
 }
 
 fn parse_file(fname: &str) -> Network {
@@ -105,25 +84,15 @@ fn parse_file(fname: &str) -> Network {
 }
 
 fn solve_part_one(fname: &str) -> u32 {
-    let loop_len = 3;
     let network = parse_file(fname);
-    let loops = find_loops(&network, loop_len);
-
-    let mut n_loops_with_t = 0;
-    for set in loops.iter() {
-        for computer in set.iter() {
-            let first_char = computer.chars().next().unwrap();
-            if first_char == 't' {
-                n_loops_with_t += 1;
-                break;
-            }
-        }
-    }
-    n_loops_with_t
+    count_subnets_len_3_with_t(&network)
 }
 
 fn main() {
     let fname = "data/input";
+    let start = Instant::now();
     let result = solve_part_one(fname);
+    let end = Instant::now();
     println!("Solution to part one: {result}");
+    println!("Elapsed time: {}s", (end - start).as_secs_f64());
 }
