@@ -13,11 +13,12 @@ I did read some of the solutions in the AoC Reddit to get inspiration and learn
 when I felt stuck.
 
 I think this repo is a way of showing that we can still have a modern
-development environment (Neovim + LSP + autocompletion + Telescope
-+ Treesitter, etc) using old hardware and the right choice of software that
-minimizes the computational load required to run them.
-We can still achieve modern computational tasks through [**frugal
-computing**][frugal] ([Wim Vanderbauwhede, 2023][vanderbauwhede2023], [Low carbon
+development environment
+(Neovim + LSP + autocompletion + Telescope Treesitter, etc)
+using old hardware and the right choice of software that minimizes the
+computational load required to run them.
+We can still achieve modern computational tasks through **frugal
+computing** ([Wim Vanderbauwhede, 2023][vanderbauwhede2023], [Low carbon
 and sustainable computing][low-carbon-computing]).
 
 ### References
