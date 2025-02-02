@@ -2,7 +2,7 @@
 
 ## How to run the solutions
 
-To run my solutions to AoC 2023 you need the Rust compiler. Since I decided not
+To run my solutions to AoC 2024 you need the Rust compiler. Since I decided not
 to use any crate and stick with the standard libraries, that would be enough.
 But I actually used `cargo` every day of the challenge to get used to the tool.
 With it you can build, run and test each solution.
